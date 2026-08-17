@@ -23,7 +23,7 @@ class SimTransport final : public ITransport {
   std::span<const RawReport> writes() const noexcept;
 
  private:
-  IClock& clock_;
+  [[maybe_unused]] IClock& clock_;
   std::deque<Result<RawReport>> reads_;
   std::vector<RawReport> writes_;
   bool closed_{};

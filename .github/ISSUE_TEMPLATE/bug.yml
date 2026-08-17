@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible defect in the offline research foundation
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        OpenXHC is not usable for machine control. Reproduce defects with offline or simulator inputs only; do not connect this software to an enabled machine.
+  - type: checkboxes
+    id: safety-state
+    attributes:
+      label: Safety state
+      options:
+        - label: I reproduced this using offline or simulator inputs only and did not connect an enabled machine.
+          required: true
+  - type: textarea
+    id: failing-test
+    attributes:
+      label: Failing behavioral test
+      description: Provide the smallest test and exact command that fails before a fix.
+      placeholder: Include test code and failure output.
+    validations:
+      required: true
+  - type: textarea
+    id: negative-case
+    attributes:
+      label: Negative case
+      description: Describe an invalid or boundary input that a wrong implementation would accept.
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Evidence provenance
+      description: State source, date, sanitized fixture or trace hash, observation conditions, confidence, and the exact claim supported.
+    validations:
+      required: true
+  - type: checkboxes
+    id: public-material
+    attributes:
+      label: Public-release hygiene
+      options:
+        - label: This report contains no vendor binaries, manuals, screenshots, decompiled source, credentials, private paths or addresses, proprietary captures, unsafe G-code, or other private artifacts.
+          required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Give the revision, operating system, compiler, CMake version, and command line.
+    validations:
+      required: true
