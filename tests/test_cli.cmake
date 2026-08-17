@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-if(NOT DEFINED OPENXHCCTL OR NOT DEFINED FIXTURE_DIR OR NOT DEFINED TEST_WORK_DIR)
+if(NOT DEFINED OPENXHCCTL OR NOT DEFINED OPENXHCCTL_FAULT_TEST OR NOT DEFINED FIXTURE_DIR OR NOT DEFINED TEST_WORK_DIR)
   message(FATAL_ERROR "CLI test configuration is incomplete")
 endif()
 
@@ -10,6 +10,7 @@ set(bad_native_record "${TEST_WORK_DIR}/bad-native-record.xhctrace")
 set(bad_tshark_record "${TEST_WORK_DIR}/bad-tshark-record.tsv")
 set(unwritable_output "${TEST_WORK_DIR}/output-directory")
 set(same_path "${TEST_WORK_DIR}/same-path.tsv")
+set(same_path_contents "0.000001000\t0x81\t04:00:01:02\n")
 set(protected_parent "${TEST_WORK_DIR}/protected-parent")
 set(sentinel_output "${protected_parent}/sentinel.xhctrace")
 set(sentinel_contents "DO_NOT_REPLACE\n")
@@ -17,7 +18,7 @@ file(MAKE_DIRECTORY "${unwritable_output}")
 file(WRITE "${bad_header}" "NOT_OPENXHC_TRACE_V1\n1000\tIN\t04000102\n")
 file(WRITE "${bad_native_record}" "OPENXHC_TRACE_V1\n1000\tIN\t04000102\n\n2000\tSIDE\t04\n")
 file(WRITE "${bad_tshark_record}" "0.000001000\t0x81\t04:00:01:02\n\n0.000002000\t0x83\t0b\n")
-file(WRITE "${same_path}" "0.000001000\t0x81\t04:00:01:02\n")
+file(WRITE "${same_path}" "${same_path_contents}")
 
 function(expect_exit expected expected_stdout expected_stderr name)
   execute_process(
@@ -74,6 +75,10 @@ expect_exit(3 empty nonempty missing_native_input trace validate "${TEST_WORK_DI
 expect_exit(3 empty nonempty missing_tshark_input trace import-tshark "${TEST_WORK_DIR}/missing.tsv" "${imported_trace}")
 expect_exit(3 empty nonempty unwritable_import_output trace import-tshark "${FIXTURE_DIR}/tshark-baseline.tsv" "${unwritable_output}")
 expect_exit(3 empty nonempty same_input_output trace import-tshark "${same_path}" "${same_path}")
+file(READ "${same_path}" same_path_after)
+if(NOT same_path_after STREQUAL same_path_contents)
+  message(FATAL_ERROR "same_input_output: source was modified")
+endif()
 
 expect_exit(4 empty nonempty invalid_header trace validate "${bad_header}")
 expect_exit(4 empty nonempty invalid_native_record trace validate "${bad_native_record}")
@@ -81,13 +86,11 @@ expect_exit(4 empty nonempty invalid_tshark_record trace import-tshark "${bad_ts
 
 file(MAKE_DIRECTORY "${protected_parent}")
 file(WRITE "${sentinel_output}" "${sentinel_contents}")
-file(CHMOD "${protected_parent}" PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 execute_process(
-  COMMAND "${OPENXHCCTL}" trace import-tshark "${FIXTURE_DIR}/tshark-baseline.tsv" "${sentinel_output}"
+  COMMAND "${CMAKE_COMMAND}" -E env OPENXHCCTL_TEST_FAIL_STAGING=1 "${OPENXHCCTL_FAULT_TEST}" trace import-tshark "${FIXTURE_DIR}/tshark-baseline.tsv" "${sentinel_output}"
   RESULT_VARIABLE preservation_result
   OUTPUT_VARIABLE preservation_stdout
   ERROR_VARIABLE preservation_stderr)
-file(CHMOD "${protected_parent}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 file(READ "${sentinel_output}" preserved_contents)
 file(GLOB protected_artifacts "${protected_parent}/*")
 file(REMOVE_RECURSE "${protected_parent}")

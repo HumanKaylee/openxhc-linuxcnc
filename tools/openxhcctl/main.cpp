@@ -153,6 +153,15 @@ std::string temporary_output_template(const char* output_path) {
   return (parent / ("." + destination.filename().string() + ".openxhcctl-XXXXXX")).string();
 }
 
+int create_temporary_output(std::string& temporary_path) {
+#ifdef OPENXHCCTL_TEST_FAULT_INJECTION
+  if (std::getenv("OPENXHCCTL_TEST_FAIL_STAGING") != nullptr) {
+    return -1;
+  }
+#endif
+  return ::mkstemp(temporary_path.data());
+}
+
 void remove_temporary_file(const std::string& temporary_path) {
   if (!temporary_path.empty()) {
     static_cast<void>(::unlink(temporary_path.c_str()));
@@ -189,7 +198,7 @@ ExitCode import_tshark(const char* input_path, const char* output_path) {
   }
 
   std::string temporary_path = temporary_output_template(output_path);
-  const int temporary_descriptor = ::mkstemp(temporary_path.data());
+  const int temporary_descriptor = create_temporary_output(temporary_path);
   if (temporary_descriptor == -1) {
     std::cerr << "error: unable to open trace output\n";
     return ExitCode::Open;

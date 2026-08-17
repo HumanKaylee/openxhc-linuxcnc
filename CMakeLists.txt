@@ -12,6 +12,11 @@ add_executable(openxhcctl tools/openxhcctl/main.cpp)
 target_link_libraries(openxhcctl PRIVATE openxhc_core)
 openxhc_enable_warnings(openxhcctl)
 
+add_executable(openxhcctl_fault_test tools/openxhcctl/main.cpp)
+target_link_libraries(openxhcctl_fault_test PRIVATE openxhc_core)
+target_compile_definitions(openxhcctl_fault_test PRIVATE OPENXHCCTL_TEST_FAULT_INJECTION)
+openxhc_enable_warnings(openxhcctl_fault_test)
+
 enable_testing()
 add_executable(test_device_identity tests/test_device_identity.cpp)
 target_include_directories(test_device_identity PRIVATE tests)
@@ -48,6 +53,7 @@ add_test(
   NAME cli
   COMMAND ${CMAKE_COMMAND}
     -DOPENXHCCTL=${CMAKE_CURRENT_BINARY_DIR}/openxhcctl
+    -DOPENXHCCTL_FAULT_TEST=${CMAKE_CURRENT_BINARY_DIR}/openxhcctl_fault_test
     -DFIXTURE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures
     -DTEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/cli-test-work
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.cmake)
