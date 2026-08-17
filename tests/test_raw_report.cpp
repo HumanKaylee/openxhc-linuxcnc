@@ -12,9 +12,26 @@ int main() {
   CHECK(report.bytes[1] == 0x00);
   CHECK(report.bytes[2] == 0xff);
 
+  std::array<std::uint8_t, 64> maximum{};
+  maximum.front() = 0x16;
+  maximum.back() = 0xe9;
+  auto maximum_parsed = openxhc::parse_raw_report(maximum);
+  CHECK(std::holds_alternative<openxhc::RawReport>(maximum_parsed));
+  const auto& maximum_report = std::get<openxhc::RawReport>(maximum_parsed);
+  CHECK(maximum_report.size == 64);
+  CHECK(maximum_report.bytes.front() == 0x16);
+  CHECK(maximum_report.bytes.back() == 0xe9);
+
   const std::array<std::uint8_t, 0> empty{};
-  CHECK(std::holds_alternative<openxhc::Error>(openxhc::parse_raw_report(empty)));
+  auto empty_parsed = openxhc::parse_raw_report(empty);
+  CHECK(std::holds_alternative<openxhc::Error>(empty_parsed));
+  const auto& empty_error = std::get<openxhc::Error>(empty_parsed);
+  CHECK(empty_error.code == openxhc::ErrorCode::InvalidReport);
+
   const std::array<std::uint8_t, 65> oversized{};
-  CHECK(std::holds_alternative<openxhc::Error>(openxhc::parse_raw_report(oversized)));
+  auto oversized_parsed = openxhc::parse_raw_report(oversized);
+  CHECK(std::holds_alternative<openxhc::Error>(oversized_parsed));
+  const auto& oversized_error = std::get<openxhc::Error>(oversized_parsed);
+  CHECK(oversized_error.code == openxhc::ErrorCode::InvalidReport);
   return 0;
 }
