@@ -19,10 +19,6 @@ bool digit_value(char character, std::uint8_t& value) noexcept {
     value = static_cast<std::uint8_t>(character - 'a' + 10);
     return true;
   }
-  if (character >= 'A' && character <= 'F') {
-    value = static_cast<std::uint8_t>(character - 'A' + 10);
-    return true;
-  }
   return false;
 }
 
@@ -170,7 +166,8 @@ Result<TraceRecord> parse_trace_line(std::string_view line) {
     return parse_error("native trace record must contain three tab-separated fields");
   }
   std::uint64_t timestamp_ns{};
-  if (!parse_uint64(fields[0], timestamp_ns)) {
+  if ((fields[0].size() > 1U && fields[0][0] == '0') ||
+      !parse_uint64(fields[0], timestamp_ns)) {
     return parse_error("native trace timestamp must be an unsigned integer nanosecond count");
   }
   Direction direction{};

@@ -48,6 +48,25 @@ bool same_record(const TraceRecord& left, const TraceRecord& right) {
   }
   return true;
 }
+
+std::string repeated_native_bytes(std::size_t count) {
+  std::string bytes;
+  for (std::size_t index = 0U; index < count; ++index) {
+    bytes += "ab";
+  }
+  return bytes;
+}
+
+std::string repeated_tshark_bytes(std::size_t count) {
+  std::string bytes;
+  for (std::size_t index = 0U; index < count; ++index) {
+    if (index != 0U) {
+      bytes += ':';
+    }
+    bytes += "ab";
+  }
+  return bytes;
+}
 } // namespace
 
 int main() {
@@ -96,6 +115,29 @@ int main() {
   auto rounded_tshark = openxhc::parse_tshark_line("0.0000000005\t0x81\t04");
   CHECK(std::holds_alternative<TraceRecord>(rounded_tshark));
   CHECK(std::get<TraceRecord>(rounded_tshark).timestamp_ns == 1U);
+  CHECK(std::get<TraceRecord>(rounded_tshark).report.size == 1U);
+  CHECK(std::get<TraceRecord>(rounded_tshark).report.bytes[0] == 0x04U);
+  auto rounded_down_tshark = openxhc::parse_tshark_line("0.0000000004\t0x81\t04");
+  CHECK(std::holds_alternative<TraceRecord>(rounded_down_tshark));
+  CHECK(std::get<TraceRecord>(rounded_down_tshark).timestamp_ns == 0U);
+  CHECK(std::get<TraceRecord>(rounded_down_tshark).report.size == 1U);
+  CHECK(std::get<TraceRecord>(rounded_down_tshark).report.bytes[0] == 0x04U);
+  auto carried_tshark = openxhc::parse_tshark_line("1.9999999995\t0x81\t04");
+  CHECK(std::holds_alternative<TraceRecord>(carried_tshark));
+  CHECK(std::get<TraceRecord>(carried_tshark).timestamp_ns == 2000000000U);
+  CHECK(std::get<TraceRecord>(carried_tshark).report.size == 1U);
+  CHECK(std::get<TraceRecord>(carried_tshark).report.bytes[0] == 0x04U);
+  auto largest_whole_second = openxhc::parse_tshark_line("18446744073\t0x81\tcd");
+  CHECK(std::holds_alternative<TraceRecord>(largest_whole_second));
+  CHECK(std::get<TraceRecord>(largest_whole_second).timestamp_ns == 18446744073000000000ULL);
+  CHECK(std::get<TraceRecord>(largest_whole_second).report.size == 1U);
+  CHECK(std::get<TraceRecord>(largest_whole_second).report.bytes[0] == 0xcdU);
+  auto maximum_tshark =
+      openxhc::parse_tshark_line("18446744073.7095516154\t0x81\tab");
+  CHECK(std::holds_alternative<TraceRecord>(maximum_tshark));
+  CHECK(std::get<TraceRecord>(maximum_tshark).timestamp_ns == 18446744073709551615ULL);
+  CHECK(std::get<TraceRecord>(maximum_tshark).report.size == 1U);
+  CHECK(std::get<TraceRecord>(maximum_tshark).report.bytes[0] == 0xabU);
 
   const auto summary = openxhc::summarize_trace(records);
   CHECK(summary.records == 3U);
@@ -105,9 +147,36 @@ int main() {
   CHECK(summary.report_ids[0x0bU] == 1U);
   CHECK(summary.lengths[4U] == 3U);
 
+  auto canonical_native = openxhc::parse_trace_line("1\tIN\tab");
+  CHECK(std::holds_alternative<TraceRecord>(canonical_native));
+  std::ostringstream canonical_output;
+  CHECK(openxhc::write_trace_record(canonical_output, std::get<TraceRecord>(canonical_native)).success);
+  CHECK(canonical_output.str() == "1\tIN\tab\n");
+
+  const auto native_64 = openxhc::parse_trace_line("1\tIN\t" + repeated_native_bytes(64U));
+  CHECK(std::holds_alternative<TraceRecord>(native_64));
+  CHECK(std::get<TraceRecord>(native_64).report.size == 64U);
+  CHECK(std::get<TraceRecord>(native_64).report.bytes[0] == 0xabU);
+  CHECK(std::get<TraceRecord>(native_64).report.bytes[63U] == 0xabU);
+  const auto tshark_64 = openxhc::parse_tshark_line("0\t0x81\t" + repeated_tshark_bytes(64U));
+  CHECK(std::holds_alternative<TraceRecord>(tshark_64));
+  CHECK(std::get<TraceRecord>(tshark_64).report.size == 64U);
+  CHECK(std::get<TraceRecord>(tshark_64).report.bytes[0] == 0xabU);
+  CHECK(std::get<TraceRecord>(tshark_64).report.bytes[63U] == 0xabU);
+
+  auto maximum_native = openxhc::parse_trace_line("18446744073709551615\tIN\tab");
+  CHECK(std::holds_alternative<TraceRecord>(maximum_native));
+  CHECK(std::get<TraceRecord>(maximum_native).timestamp_ns == 18446744073709551615ULL);
+  CHECK(std::get<TraceRecord>(maximum_native).report.size == 1U);
+  CHECK(std::get<TraceRecord>(maximum_native).report.bytes[0] == 0xabU);
+
   CHECK(has_parse_error(openxhc::parse_trace_line("\tIN\t04000102")));
+  CHECK(has_parse_error(openxhc::parse_trace_line("0001\tIN\tab")));
+  CHECK(has_parse_error(openxhc::parse_trace_line("1\tIN\tAB")));
   CHECK(has_parse_error(openxhc::parse_tshark_line("\t0x81\t04:00:01:02")));
   CHECK(has_parse_error(openxhc::parse_tshark_line("0.1\t0x83\t04")));
+  CHECK(has_parse_error(openxhc::parse_tshark_line("18446744074\t0x81\t04")));
+  CHECK(has_parse_error(openxhc::parse_tshark_line("18446744073.7095516155\t0x81\t04")));
   CHECK(has_parse_error(openxhc::parse_trace_line("1000\tIN\t040")));
   CHECK(has_parse_error(openxhc::parse_tshark_line("0.1\t0x81\t04:0g")));
   CHECK(has_parse_error(openxhc::parse_tshark_line("0.1\t0x81\t04:")));
@@ -127,6 +196,7 @@ int main() {
     oversized_tshark += "00";
   }
   CHECK(has_parse_error(openxhc::parse_tshark_line(oversized_tshark)));
+  CHECK(has_parse_error(openxhc::parse_trace_line("18446744073709551616\tIN\t04")));
   CHECK(has_parse_error(openxhc::parse_tshark_line("18446744073709551616\t0x81\t04")));
   return 0;
 }
