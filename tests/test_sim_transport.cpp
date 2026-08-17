@@ -64,6 +64,7 @@ int main() {
   CHECK(clock.now() == 25ms);
 
   transport.close();
+  transport.close();
   CHECK(has_error(transport.identify(), openxhc::ErrorCode::Disconnected, "transport closed"));
   CHECK(has_error(transport.read(10ms), openxhc::ErrorCode::Disconnected, "transport closed"));
   CHECK(has_error(transport.write(write_report), openxhc::ErrorCode::Disconnected,
