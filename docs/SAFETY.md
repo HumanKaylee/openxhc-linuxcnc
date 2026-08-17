@@ -7,7 +7,7 @@ OpenXHC is not usable for machine control. No motion or output command has been 
 ## Required progression
 
 1. Simulator and recorded traces.
-2. Live USB descriptors, status reads, and only previously established no-motion/no-output handshake or keepalive behavior.
+2. Live USB enumeration, descriptor queries, and opening/closing the HID path only. Do not send or receive HID reports; all report traffic is deferred to a later explicitly approved plan.
 3. Controller removed from the machine, using a logic analyzer and dummy loads.
 4. Installed controller with stepper-drive enable and VFD/spindle control physically disconnected.
 5. One axis at minimum practical speed, no tool or workpiece, with an operator beside the physical E-stop.
