@@ -1,0 +1,11 @@
+build*/
+*.pcap
+*.pcapng
+*.xhctrace
+*.tsv
+*.dll
+*.exe
+*.msi
+*.qcow2
+private/
+vendor/

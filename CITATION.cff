@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use or discuss OpenXHC LinuxCNC, please cite this repository."
+title: "OpenXHC LinuxCNC"
+type: software
+authors:
+  - name: "OpenXHC contributors"
+repository-code: "https://github.com/HumanKaylee/openxhc-linuxcnc"
+license: "GPL-2.0-or-later"
+abstract: "Safety-first research toward native LinuxCNC support for the XHC MK4-IV USB motion controller."
