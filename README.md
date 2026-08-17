@@ -13,6 +13,16 @@ OpenXHC is an independent effort to document and implement native LinuxCNC suppo
 
 - Motion, homing, limits, probing, outputs, spindle control, and LinuxCNC HAL integration.
 
+## Offline trace tooling
+
+`openxhcctl` only validates and summarizes sanitized trace files or converts TShark text into the canonical offline trace format. It has no live-device or machine-control support.
+
+```sh
+openxhcctl trace validate <input.xhctrace>
+openxhcctl trace summary <input.xhctrace>
+openxhcctl trace import-tshark <input.tsv> <output.xhctrace>
+```
+
 ## Purpose
 
 The project aims to create an independently implemented, evidence-backed LinuxCNC integration for the exact identified controller. LinuxCNC remains responsible for G-code interpretation, trajectory planning, kinematics, and machine policy. OpenXHC is intended to translate documented device state and commands only after each behavior has met the project’s safety and evidence gates.

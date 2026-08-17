@@ -8,6 +8,10 @@ target_include_directories(openxhc_core PUBLIC include)
 target_compile_features(openxhc_core PUBLIC cxx_std_20)
 openxhc_enable_warnings(openxhc_core)
 
+add_executable(openxhcctl tools/openxhcctl/main.cpp)
+target_link_libraries(openxhcctl PRIVATE openxhc_core)
+openxhc_enable_warnings(openxhcctl)
+
 enable_testing()
 add_executable(test_device_identity tests/test_device_identity.cpp)
 target_include_directories(test_device_identity PRIVATE tests)
@@ -39,6 +43,14 @@ target_link_libraries(test_trace PRIVATE openxhc_core)
 target_compile_definitions(test_trace PRIVATE OPENXHC_TEST_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
 openxhc_enable_warnings(test_trace)
 add_test(NAME trace COMMAND test_trace)
+
+add_test(
+  NAME cli
+  COMMAND ${CMAKE_COMMAND}
+    -DOPENXHCCTL=${CMAKE_CURRENT_BINARY_DIR}/openxhcctl
+    -DFIXTURE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures
+    -DTEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/cli-test-work
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.cmake)
 
 option(OPENXHC_ENABLE_FUZZING "Build libFuzzer targets" OFF)
 if(OPENXHC_ENABLE_FUZZING)
