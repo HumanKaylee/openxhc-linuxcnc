@@ -8,7 +8,11 @@
 namespace openxhc {
 enum class ErrorCode { InvalidArgument, UnsupportedDevice, InvalidReport, InvalidTransition,
                        Timeout, Disconnected, WriteDisabled, ParseError };
-struct Error { ErrorCode code; std::string message; };
+struct Error {
+  ErrorCode code;
+  // Dynamically allocated diagnostic control-plane text; do not construct or carry it in future fixed-capacity motion paths.
+  std::string message;
+};
 template <class T> using Result = std::variant<T, Error>;
 struct Status {
   bool success;
