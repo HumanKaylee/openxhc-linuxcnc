@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "openxhc/trace.hpp"
 
+#include <cerrno>
+#include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <variant>
 #include <vector>
 
@@ -110,6 +118,47 @@ ExitCode summary(const char* input_path) {
   return ExitCode::Success;
 }
 
+bool same_existing_file(const char* input_path, const char* output_path) {
+  struct stat input_status {};
+  struct stat output_status {};
+  return ::stat(input_path, &input_status) == 0 && ::stat(output_path, &output_status) == 0 &&
+         input_status.st_dev == output_status.st_dev && input_status.st_ino == output_status.st_ino;
+}
+
+bool write_all(int file_descriptor, const std::string& contents) {
+  const char* current = contents.data();
+  std::size_t remaining = contents.size();
+  while (remaining != 0U) {
+    const ssize_t written = ::write(file_descriptor, current, remaining);
+    if (written < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      return false;
+    }
+    if (written == 0) {
+      return false;
+    }
+    const auto count = static_cast<std::size_t>(written);
+    current += count;
+    remaining -= count;
+  }
+  return true;
+}
+
+std::string temporary_output_template(const char* output_path) {
+  const std::filesystem::path destination(output_path);
+  const std::filesystem::path parent =
+      destination.has_parent_path() ? destination.parent_path() : std::filesystem::path{"."};
+  return (parent / ("." + destination.filename().string() + ".openxhcctl-XXXXXX")).string();
+}
+
+void remove_temporary_file(const std::string& temporary_path) {
+  if (!temporary_path.empty()) {
+    static_cast<void>(::unlink(temporary_path.c_str()));
+  }
+}
+
 ExitCode import_tshark(const char* input_path, const char* output_path) {
   std::vector<openxhc::TraceRecord> records;
   const ReadResult result = read_tshark_trace(input_path, records);
@@ -117,20 +166,46 @@ ExitCode import_tshark(const char* input_path, const char* output_path) {
     return exit_code(result);
   }
 
-  std::ofstream output(output_path);
-  if (!output.is_open()) {
-    std::cerr << "error: unable to open trace output\n";
+  if (same_existing_file(input_path, output_path)) {
+    std::cerr << "error: input and output refer to the same file\n";
     return ExitCode::Open;
   }
-  output << kTraceHeader << '\n';
+
+  std::ostringstream serialized;
+  serialized << kTraceHeader << '\n';
+  if (!serialized) {
+    std::cerr << "error: unable to serialize trace output\n";
+    return ExitCode::Open;
+  }
   for (const openxhc::TraceRecord& record : records) {
-    if (!openxhc::write_trace_record(output, record).success) {
-      std::cerr << "error: unable to write trace output\n";
+    if (!openxhc::write_trace_record(serialized, record).success) {
+      std::cerr << "error: unable to serialize trace output\n";
       return ExitCode::Open;
     }
   }
-  if (!output) {
+  if (!serialized) {
+    std::cerr << "error: unable to serialize trace output\n";
+    return ExitCode::Open;
+  }
+
+  std::string temporary_path = temporary_output_template(output_path);
+  const int temporary_descriptor = ::mkstemp(temporary_path.data());
+  if (temporary_descriptor == -1) {
+    std::cerr << "error: unable to open trace output\n";
+    return ExitCode::Open;
+  }
+
+  const bool wrote = write_all(temporary_descriptor, serialized.str());
+  const bool flushed = ::fsync(temporary_descriptor) == 0;
+  const bool closed = ::close(temporary_descriptor) == 0;
+  if (!wrote || !flushed || !closed) {
+    remove_temporary_file(temporary_path);
     std::cerr << "error: unable to write trace output\n";
+    return ExitCode::Open;
+  }
+  if (::rename(temporary_path.c_str(), output_path) != 0) {
+    remove_temporary_file(temporary_path);
+    std::cerr << "error: unable to finalize trace output\n";
     return ExitCode::Open;
   }
   return ExitCode::Success;
