@@ -41,7 +41,9 @@ Adding any live transport or HAL target is outside this phase. It requires a sep
 
 ### Supply chain and build automation
 
-`docs/dependencies.lock` records the reviewed direct external baselines. CMake generates `openxhc.spdx.json` deterministically from that exact file with fixed creation metadata, sorted packages, and a content-derived namespace. Python tests reject malformed rows, empty fields, duplicate names, generated SPDX-ID collisions, and unstable output.
+`docs/dependencies.lock` records the reviewed direct external baselines. CMake generates LF-only `openxhc.spdx.json` deterministically from that exact file with fixed creation metadata, sorted packages, and a content-derived namespace. Python tests reject malformed rows, empty fields, duplicate names, generated SPDX-ID collisions, and same-file/hardlink/symlink output aliases.
+
+The generator validates and serializes before publication, then uses a checked same-directory binary temporary write, flush, `fsync`, close, and atomic replacement. Validation or finalization failure is non-destructive: an existing destination remains byte-identical, an absent destination stays absent, temporary artifacts are removed, and the nonzero process status fails the CMake custom command. A preserved prior SBOM is stale build output, not a successful current result.
 
 CI builds and tests with both GCC and Clang, runs the SPDX test, and separately runs every CTest under Clang ASan+UBSan. CodeQL performs C++ analysis. Dependabot monitors GitHub Actions updates. Workflow permissions are least-privilege for their jobs, concurrent obsolete runs are cancelled, and no workflow reads repository secrets.
 

@@ -30,7 +30,7 @@ Run the Python standard-library test directly:
 python tests/test_generate_spdx.py
 ```
 
-It verifies exact SPDX 2.3 fields, fixed creation metadata, sorted packages and `documentDescribes`, content-derived namespace, byte-identical output, a trailing newline, malformed and empty fields, duplicate names, generated SPDX-ID collisions, and wrong-argument usage failures.
+It verifies exact LF-only SPDX 2.3 JSON bytes on Linux and Windows, fixed creation metadata, sorted packages and `documentDescribes`, content-derived namespace, a trailing newline, malformed and empty fields, duplicate names, generated SPDX-ID collisions, same-file/hardlink/symlink rejection, deterministic replacement failure, and wrong-argument usage failures.
 
 Every normal CMake build generates this build artifact from `docs/dependencies.lock`:
 
@@ -38,7 +38,11 @@ Every normal CMake build generates this build artifact from `docs/dependencies.l
 <build-directory>/openxhc.spdx.json
 ```
 
-The generated file is not committed. Rebuilding from unchanged lock bytes produces identical UTF-8 JSON. Review any lock-file change together with its license and source provenance; the SBOM generator does not download or verify dependencies.
+The generated file is not committed. Rebuilding from unchanged lock content produces identical UTF-8 JSON with LF bytes only. Review any lock-file change together with its license and source provenance; the SBOM generator does not download or verify dependencies.
+
+SBOM publication is non-destructive. The generator validates and serializes in memory, rejects an output that refers to the input through the same path, a hardlink, or a symlink, then writes a same-directory temporary file in binary mode. It checks the byte count, flushes, `fsync`s, closes, and atomically replaces the destination. A validation, staging, close, or replacement failure exits nonzero, removes the temporary file, and preserves a pre-existing destination byte-for-byte. If no destination existed, no new or partial destination appears.
+
+The process exit status is authoritative. CMake/Ninja fails the `openxhc_spdx` custom command on any nonzero result. A prior good SBOM may remain intentionally unchanged after a failed rebuild, but it is stale: the changed lock or generator dependency remains newer, so the next build retries generation. Do not consume an SBOM from a failed build.
 
 ## Sanitizers
 
