@@ -154,13 +154,14 @@ std::string temporary_output_template(const char* output_path) {
 }
 
 int create_temporary_output(std::string& temporary_path) {
-#ifdef OPENXHCCTL_TEST_FAULT_INJECTION
-  if (std::getenv("OPENXHCCTL_TEST_FAIL_STAGING") != nullptr) {
-    return -1;
-  }
-#endif
   return ::mkstemp(temporary_path.data());
 }
+
+#ifdef OPENXHCCTL_TEST_FAULT_INJECTION
+bool staging_fault_requested() {
+  return std::getenv("OPENXHCCTL_TEST_FAIL_STAGING") != nullptr;
+}
+#endif
 
 void remove_temporary_file(const std::string& temporary_path) {
   if (!temporary_path.empty()) {
@@ -204,8 +205,12 @@ ExitCode import_tshark(const char* input_path, const char* output_path) {
     return ExitCode::Open;
   }
 
-  const bool wrote = write_all(temporary_descriptor, serialized.str());
-  const bool flushed = ::fsync(temporary_descriptor) == 0;
+  bool injected_failure = false;
+#ifdef OPENXHCCTL_TEST_FAULT_INJECTION
+  injected_failure = staging_fault_requested();
+#endif
+  const bool wrote = !injected_failure && write_all(temporary_descriptor, serialized.str());
+  const bool flushed = wrote && ::fsync(temporary_descriptor) == 0;
   const bool closed = ::close(temporary_descriptor) == 0;
   if (!wrote || !flushed || !closed) {
     remove_temporary_file(temporary_path);
