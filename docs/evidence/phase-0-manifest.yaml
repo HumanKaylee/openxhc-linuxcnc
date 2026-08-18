@@ -1,0 +1,88 @@
+schema_version: 1
+record_type: phase-0-target-toolchain-validation
+date: "2026-08-17"
+repository:
+  branch: phase-0-foundation
+  commit: f549a3cb8a4bb2289ca18a39746e826820bba3a3
+target:
+  class: Acer PREEMPT_RT host
+  validation_clone: ephemeral, validation-only
+protected_state:
+  before:
+    mach3_vm_service: active
+    qemu_process_count: 3
+    xhci_driver: vfio-pci
+  after:
+    mach3_vm_service: active
+    qemu_process_count: 3
+    xhci_driver: vfio-pci
+toolchain:
+  cmake:
+    package_version: "4.4.2-1.1"
+    executable_version: "4.4.2"
+    origin: CachyOS extra v3
+    signature_validated: true
+  ninja:
+    package_version: "1.13.2-3.1"
+    executable_version: "1.13.2"
+    origin: CachyOS extra v3
+    signature_validated: true
+  wireshark_cli:
+    package_version: "4.7.2-1"
+    executable_version: "4.7.2"
+    origin: official extra
+    signature_validated: true
+  arch_audit:
+    package_version: "0.2.0-5.1"
+    executable_version: "0.2.0"
+    origin: CachyOS extra v3
+    signature_validated: true
+  compiler:
+    family: GCC
+    version: "16.1.1"
+  python:
+    version: "3.14.6"
+reviewed_project_baselines:
+  hidapi: "0.15.0-1.1"
+  libusb: "1.0.30-1.1"
+  linuxcnc: "2.9.10-1"
+transaction:
+  installed_required_dependencies:
+    cppdap: "1.58.0-3.1"
+    rhash: "1.4.6-1.1"
+    bcg729: "1.1.1-2.1"
+  protected_packages_removed_or_replaced: false
+security_exception:
+  arch_audit:
+    advisory: AVG-2898
+    status: open
+    package: libxml2
+    installed_version: "2.15.3-1.1"
+    tracker_fixed_version: unknown
+  cna_ranges_exclude_installed_version:
+    CVE-2025-49794: "affected below 2.15.0"
+    CVE-2025-49795: "affected 2.10.0 through below 2.14.5"
+    CVE-2025-49796: "affected below 2.15.0"
+    CVE-2025-6170: "affected below 2.14.5"
+  approval: human-approved documented exception for offline Phase 0 validation
+validation:
+  configure: passed
+  build: passed
+  ctest:
+    passed: 6
+    total: 6
+  python_spdx_tests:
+    passed: 9
+    total: 9
+  spdx_generated: true
+  validation_clone_clean: true
+offline_boundaries:
+  build_downloads: none
+  device_access_api_or_linkage: none
+  controller_or_device_testing: false
+  usb_reports_sent: false
+  motion_or_output_commands_sent: false
+claims:
+  offline_foundation_build_verified: true
+  live_linux_driver_support_verified: false
+  machine_control_support_verified: false
