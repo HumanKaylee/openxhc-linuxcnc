@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "openxhc/hid_probe.hpp"
 #include "openxhc/hid_transport.hpp"
 #include "test_support.hpp"
 

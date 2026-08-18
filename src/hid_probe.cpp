@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "openxhc/hid_probe.hpp"
 
-#include "openxhc/hid_transport.hpp"
-
 #include <algorithm>
 #include <array>
 #include <memory>
@@ -29,6 +27,17 @@ Result<DeviceIdentity> normalize_hid_identity(std::uint16_t vendor_id,
   }
   return DeviceIdentity{vendor_id, product_id, interface_number, std::move(normalized),
                         release_number};
+}
+
+std::wstring_view select_identity_string(const wchar_t* product_string,
+                                         const wchar_t* manufacturer_string) noexcept {
+  if (product_string != nullptr && product_string[0] != L'\0') {
+    return std::wstring_view(product_string);
+  }
+  if (manufacturer_string != nullptr && manufacturer_string[0] != L'\0') {
+    return std::wstring_view(manufacturer_string);
+  }
+  return std::wstring_view();
 }
 
 #ifdef OPENXHC_WITH_HIDAPI

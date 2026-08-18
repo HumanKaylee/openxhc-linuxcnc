@@ -57,17 +57,6 @@ Status HidTransport::write(const RawReport& report) {
                       "Writing to the controller is disabled at the current evidence gate");
 }
 
-std::wstring_view select_identity_string(const wchar_t* product_string,
-                                         const wchar_t* manufacturer_string) noexcept {
-  if (product_string != nullptr && product_string[0] != L'\0') {
-    return std::wstring_view(product_string);
-  }
-  if (manufacturer_string != nullptr && manufacturer_string[0] != L'\0') {
-    return std::wstring_view(manufacturer_string);
-  }
-  return std::wstring_view();
-}
-
 bool is_recoverable_read_error(ErrorCode code) noexcept {
   return code == ErrorCode::Disconnected;
 }
