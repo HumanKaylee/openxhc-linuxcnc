@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "openxhc/hid_probe.hpp"
 #include "openxhc/trace.hpp"
 
 #include <cerrno>
@@ -21,13 +22,72 @@
 namespace {
 constexpr std::string_view kTraceHeader = "OPENXHC_TRACE_V1";
 
-enum class ExitCode : int { Success = 0, Usage = 2, Open = 3, Parse = 4 };
+enum class ExitCode : int { Success = 0, Usage = 2, Open = 3, Parse = 4, Unsupported = 5 };
 enum class ReadResult { Success, Open, Parse };
 
 void print_usage() {
   std::cerr << "usage: openxhcctl trace validate <input.xhctrace>\n"
             << "       openxhcctl trace summary <input.xhctrace>\n"
-            << "       openxhcctl trace import-tshark <input.tsv> <output.xhctrace>\n";
+            << "       openxhcctl trace import-tshark <input.tsv> <output.xhctrace>\n"
+            << "       openxhcctl device list [--show-paths]\n";
+}
+
+#ifndef OPENXHCCTL_TEST_HID_FIXTURE
+ExitCode print_hid_error(const openxhc::Error& error) {
+  std::cerr << "error: " << error.message << '\n';
+  return error.code == openxhc::ErrorCode::UnsupportedDevice ? ExitCode::Unsupported
+                                                             : ExitCode::Open;
+}
+#endif
+
+void print_device(const openxhc::DeviceIdentity& identity, std::string_view path) {
+  const auto caller_flags = std::cout.flags();
+  const char caller_fill = std::cout.fill();
+  std::cout << std::hex << std::setfill('0') << std::setw(4) << identity.vendor_id << ':'
+            << std::setw(4) << identity.product_id << std::dec << std::setfill(' ')
+            << " interface=" << identity.interface_number << " product=\""
+            << identity.product_string << "\" release=0x" << std::hex << std::setfill('0')
+            << std::setw(4) << identity.release_number << std::dec << std::setfill(' ')
+            << " path=" << path << '\n';
+  std::cout.flags(caller_flags);
+  std::cout.fill(caller_fill);
+}
+
+#ifdef OPENXHCCTL_TEST_HID_FIXTURE
+std::vector<openxhc::HidDeviceIdentity> fixture_hid_devices() {
+  return {{{0x10ce, 0xeb73, 0, "XHC MACH3 CARD", 0x0100}, "/dev/hidraw-fixture-0"},
+          {{0x10ce, 0xeb73, 1, "XHC MACH3 CARD", 0x0100}, "/dev/hidraw-fixture-1"}};
+}
+#endif
+
+ExitCode list_devices(bool show_paths) {
+#ifdef OPENXHCCTL_TEST_HID_FIXTURE
+  const auto devices = fixture_hid_devices();
+  for (const auto& device : devices) {
+    print_device(device.identity, show_paths ? std::string_view(device.path) : "<redacted>");
+  }
+  return ExitCode::Success;
+#else
+  if (show_paths) {
+    const auto devices = openxhc::enumerate_supported_hid_with_paths();
+    if (std::holds_alternative<openxhc::Error>(devices)) {
+      return print_hid_error(std::get<openxhc::Error>(devices));
+    }
+    for (const auto& device : std::get<std::vector<openxhc::HidDeviceIdentity>>(devices)) {
+      print_device(device.identity, device.path);
+    }
+    return ExitCode::Success;
+  }
+
+  const auto devices = openxhc::enumerate_supported_hid();
+  if (std::holds_alternative<openxhc::Error>(devices)) {
+    return print_hid_error(std::get<openxhc::Error>(devices));
+  }
+  for (const auto& identity : std::get<std::vector<openxhc::DeviceIdentity>>(devices)) {
+    print_device(identity, "<redacted>");
+  }
+  return ExitCode::Success;
+#endif
 }
 
 ReadResult read_native_trace(const char* input_path, std::vector<openxhc::TraceRecord>& records) {
@@ -227,6 +287,18 @@ ExitCode import_tshark(const char* input_path, const char* output_path) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
+  if (argc >= 3 && std::string_view(argv[1]) == "device" &&
+      std::string_view(argv[2]) == "list") {
+    if (argc == 3) {
+      return static_cast<int>(list_devices(false));
+    }
+    if (argc == 4 && std::string_view(argv[3]) == "--show-paths") {
+      return static_cast<int>(list_devices(true));
+    }
+    print_usage();
+    return static_cast<int>(ExitCode::Usage);
+  }
+
   if (argc < 3 || std::string_view(argv[1]) != "trace") {
     print_usage();
     return static_cast<int>(ExitCode::Usage);

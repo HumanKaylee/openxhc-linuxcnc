@@ -25,6 +25,9 @@ jobs:
       - run: cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} -DCMAKE_BUILD_TYPE=Debug
       - run: cmake --build build
       - run: ctest --test-dir build --output-on-failure
+      - run: cmake -S . -B build-hid -G Ninja -DOPENXHC_ENABLE_HIDAPI=ON
+      - run: cmake --build build-hid
+      - run: ctest --test-dir build-hid --output-on-failure
       - run: python tests/test_generate_spdx.py
 
   sanitizers:

@@ -1,0 +1,2 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="10ce", ATTRS{idProduct}=="eb73", GROUP="openxhc", MODE="0660"
