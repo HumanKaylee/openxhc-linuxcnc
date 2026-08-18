@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "openxhc/hid_probe.hpp"
+#include "openxhc/hid_transport.hpp"
+#include "openxhc/status_report.hpp"
 #include "openxhc/trace.hpp"
 
 #include <cerrno>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -29,7 +32,8 @@ void print_usage() {
   std::cerr << "usage: openxhcctl trace validate <input.xhctrace>\n"
             << "       openxhcctl trace summary <input.xhctrace>\n"
             << "       openxhcctl trace import-tshark <input.tsv> <output.xhctrace>\n"
-            << "       openxhcctl device list [--show-paths]\n";
+            << "       openxhcctl device list [--show-paths]\n"
+            << "       openxhcctl status [--seconds N] [--interface N]\n";
 }
 
 #ifndef OPENXHCCTL_TEST_HID_FIXTURE
@@ -286,7 +290,111 @@ ExitCode import_tshark(const char* input_path, const char* output_path) {
 }
 }  // namespace
 
+namespace {
+constexpr int kStatusMaxSecondsWithoutOverride = 120;
+
+// Read-only listen on the device-initiated interrupt IN stream. Bounded by construction:
+// it never writes, never loops unbounded, and reports where the record is dynamic rather
+// than interpreting any byte.
+ExitCode status_listen(int seconds, int interface_number, bool allow_long) {
+  if (seconds <= 0) {
+    std::cerr << "error: --seconds must be positive\n";
+    return ExitCode::Usage;
+  }
+  if (seconds > kStatusMaxSecondsWithoutOverride && !allow_long) {
+    std::cerr << "error: --seconds above " << kStatusMaxSecondsWithoutOverride
+              << " requires --allow-long\n";
+    return ExitCode::Usage;
+  }
+
+  auto opened = openxhc::open_supported_hid_transport(interface_number);
+  if (std::holds_alternative<openxhc::Error>(opened)) {
+    const auto& error = std::get<openxhc::Error>(opened);
+    std::cerr << "error: " << error.message << '\n';
+    return error.code == openxhc::ErrorCode::UnsupportedDevice ? ExitCode::Unsupported
+                                                               : ExitCode::Open;
+  }
+  auto transport = std::get<std::unique_ptr<openxhc::HidTransport>>(std::move(opened));
+
+  openxhc::FieldActivity activity;
+  std::uint64_t records = 0U;
+  std::uint64_t timeouts = 0U;
+  std::uint64_t malformed = 0U;
+
+  const auto started = std::chrono::steady_clock::now();
+  const auto deadline = started + std::chrono::seconds(seconds);
+  while (std::chrono::steady_clock::now() < deadline) {
+    auto incoming = transport->read(std::chrono::milliseconds{500});
+    if (std::holds_alternative<openxhc::Error>(incoming)) {
+      const auto& error = std::get<openxhc::Error>(incoming);
+      if (error.code == openxhc::ErrorCode::Timeout) {
+        ++timeouts;
+        continue;
+      }
+      std::cerr << "error: " << error.message << '\n';
+      transport->close();
+      return ExitCode::Open;
+    }
+
+    const auto& raw = std::get<openxhc::RawReport>(incoming);
+    auto parsed = openxhc::parse_status_record(raw);
+    if (std::holds_alternative<openxhc::Error>(parsed)) {
+      ++malformed;
+      std::cout << "record bytes=" << raw.size << " UNRECOGNISED\n";
+      continue;
+    }
+    ++records;
+    activity.observe(std::get<openxhc::StatusRecord>(parsed));
+  }
+  transport->close();
+
+  const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           std::chrono::steady_clock::now() - started)
+                           .count();
+  std::cout << "records=" << records << '\n'
+            << "unrecognised=" << malformed << '\n'
+            << "timeouts=" << timeouts << '\n'
+            << "elapsed_ms=" << elapsed << '\n'
+            << "changing_offsets=" << activity.changed_count() << '\n';
+  std::cout << "changed=";
+  for (std::size_t offset = 0U; offset < openxhc::kStatusRecordBytes; ++offset) {
+    if (activity.changed(offset)) {
+      std::cout << offset << ' ';
+    }
+  }
+  std::cout << "\nnote: offsets only; no field meaning is claimed\n";
+  return ExitCode::Success;
+}
+}  // namespace
+
 int main(int argc, char* argv[]) {
+  if (argc >= 2 && std::string_view(argv[1]) == "status") {
+    int seconds = 10;
+    int interface_number = 0;
+    bool allow_long = false;
+    for (int index = 2; index < argc; ++index) {
+      const std::string_view option(argv[index]);
+      if (option == "--allow-long") {
+        allow_long = true;
+        continue;
+      }
+      if (index + 1 >= argc) {
+        print_usage();
+        return static_cast<int>(ExitCode::Usage);
+      }
+      const std::string value(argv[++index]);
+      if (option == "--seconds") {
+        seconds = std::atoi(value.c_str());
+      } else if (option == "--interface") {
+        interface_number = std::atoi(value.c_str());
+      } else {
+        print_usage();
+        return static_cast<int>(ExitCode::Usage);
+      }
+    }
+    return static_cast<int>(status_listen(seconds, interface_number, allow_long));
+  }
+
   if (argc >= 3 && std::string_view(argv[1]) == "device" &&
       std::string_view(argv[2]) == "list") {
     if (argc == 3) {
