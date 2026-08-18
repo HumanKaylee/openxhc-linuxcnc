@@ -9,7 +9,10 @@ Only `Machine verified` means working. This matrix concerns the exact USB identi
 | Windows capability | Current evidence | Notes |
 | --- | --- | --- |
 | Device identity | Machine observed | `10ce:eb73` / `XHC MACH3 CARD`; two HID interfaces |
-| Connection, identification, and negotiation | Unknown | No usable driver behavior claimed |
+| Raw report envelope | Captured | 38-byte IN and 64-byte OUT records observed; no field meaning claimed |
+| Startup message sequence | Captured | Six OUT records, byte-identical across two independent runs, absent from the closed-application control |
+| Device-initiated status cadence | Captured | 1.40–1.42 s IN interval, present with the vendor application closed |
+| Connection, identification, and negotiation | Unknown | Sequence captured, but no message purpose established and no driver behavior claimed |
 | Hot-plug detection and reinitialization | Unknown | No behavior claimed |
 | X, Y, Z, and A steps | Unknown | No motion implemented or verified |
 | Direction, scaling, pulse rate, and step accounting | Unknown | No motion implemented or verified |

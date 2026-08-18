@@ -116,3 +116,54 @@ read_only_hid_identification:
     emergency_mode: true
     gcode_loaded: false
     reset_pressed: false
+host_side_usb_capture:
+  date: "2026-08-18"
+  implementation_commit: e6032855bd2346a2bb76ba4cf15399b72357c7d7
+  method: kernel USB capture driver on the vendor control stack
+  prerequisite_applied: SHA-2 code-signing support update; the capture driver refuses to install without it
+  raw_captures_published: false
+  aggregates_published: true
+  safety_state_during_all_captures:
+    reset_pressed: false
+    motion_commanded: false
+    output_or_spindle_commanded: false
+    inputs_toggled: false
+    gcode_loaded: false
+    emergency_mode: true
+  captures:
+    - name: application-closed control
+      seconds: 30
+      in_records: 21
+      out_records: 0
+      distinct_payloads: 1
+    - name: startup run A
+      seconds: 37
+      in_records: 28
+      out_records: 6
+      distinct_payloads: 7
+    - name: startup run B
+      seconds: 37
+      in_records: 28
+      out_records: 6
+      distinct_payloads: 7
+    - name: connected idle
+      seconds: 60
+      in_records: 42
+      out_records: 0
+      distinct_payloads: 1
+  observations:
+    in_record_bytes: 38
+    out_record_bytes: 64
+    in_cadence_seconds_range: [1.40, 1.42]
+    device_initiated_in_stream: true
+    startup_out_sequence_identical_across_runs: true
+    out_records_present_without_startup: false
+  unresolved_conflicts:
+    - out record length disagrees with the declared 32-byte output report descriptor
+    - in record length exceeds the 36 bytes implied by the input report descriptor
+  field_semantics_claimed: false
+  device_state_after:
+    windows_matching_nodes: 5
+    windows_node_config_manager_errors: 0
+    mach3_status: XHC NcUsbPod Connected.
+    usb_error_events: 0

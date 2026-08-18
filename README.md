@@ -7,9 +7,13 @@ OpenXHC is an independent effort to document and implement native LinuxCNC suppo
 ## Verified today
 
 - The device is a two-interface USB HID controller accessible through standard HID APIs.
-- **Read-only HID identification verified** on the target Acer host for exact interfaces 0 and 1 of `10ce:eb73` / `XHC MACH3 CARD`.
+- **Read-only HID identification verified** for exact interfaces 0 and 1 of `10ce:eb73` / `XHC MACH3 CARD`.
 - Device paths are redacted by default as `path=<redacted>`; no path was retained in committed evidence.
-- The production Mach3 VM was restored and re-verified after the bounded identification session.
+- **Host-side USB traffic captured** with no motion, output, spindle, or reset action: the device
+  transmits status without any host application running, and a six-record startup sequence repeats
+  byte-for-byte across two independent runs and is absent from the closed-application control.
+  Aggregates only — see [Protocol evidence](docs/PROTOCOL.md). **No field meaning is claimed.**
+- The vendor control stack was restored and re-verified after every session.
 - The repository also contains offline parsers, simulation, and evidence tooling.
 
 ## Not yet working
