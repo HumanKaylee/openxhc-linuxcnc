@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -153,6 +154,30 @@ int main() {
     RawReport outgoing{};
     outgoing.size = 1U;
     CHECK(transport.write(outgoing).error->code == ErrorCode::WriteDisabled);
+  }
+
+  // Identity string source. This controller carries "XHC MACH3 CARD" in its MANUFACTURER
+  // descriptor and has no product string at all, so a product-only rule never matches it
+  // on a host that does not synthesise one.
+  {
+    const wchar_t* product = L"SOME PRODUCT";
+    const wchar_t* manufacturer = L"XHC MACH3 CARD";
+    const wchar_t* empty = L"";
+
+    // A real product string wins when the device provides one.
+    CHECK(openxhc::select_identity_string(product, manufacturer) == std::wstring_view(product));
+    // The observed case: no product descriptor, identity in the manufacturer descriptor.
+    CHECK(openxhc::select_identity_string(nullptr, manufacturer) ==
+          std::wstring_view(manufacturer));
+    // NEGATIVE: an EMPTY product string must not win over a real manufacturer string.
+    CHECK(openxhc::select_identity_string(empty, manufacturer) ==
+          std::wstring_view(manufacturer));
+    // NEGATIVE: nothing usable anywhere yields empty, not a dereference of null.
+    CHECK(openxhc::select_identity_string(nullptr, nullptr).empty());
+    CHECK(openxhc::select_identity_string(empty, empty).empty());
+    CHECK(openxhc::select_identity_string(empty, nullptr).empty());
+    // A product string with no manufacturer still works.
+    CHECK(openxhc::select_identity_string(product, nullptr) == std::wstring_view(product));
   }
 
   // Reconnect policy: only a lost link warrants reopening. A timeout means keep reading

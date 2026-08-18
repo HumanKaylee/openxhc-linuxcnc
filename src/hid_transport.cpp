@@ -4,6 +4,7 @@
 #include "openxhc/hid_probe.hpp"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -54,6 +55,17 @@ Status HidTransport::write(const RawReport& report) {
   static_cast<void>(report);
   return Status::fail(ErrorCode::WriteDisabled,
                       "Writing to the controller is disabled at the current evidence gate");
+}
+
+std::wstring_view select_identity_string(const wchar_t* product_string,
+                                         const wchar_t* manufacturer_string) noexcept {
+  if (product_string != nullptr && product_string[0] != L'\0') {
+    return std::wstring_view(product_string);
+  }
+  if (manufacturer_string != nullptr && manufacturer_string[0] != L'\0') {
+    return std::wstring_view(manufacturer_string);
+  }
+  return std::wstring_view();
 }
 
 bool is_recoverable_read_error(ErrorCode code) noexcept {
@@ -134,8 +146,7 @@ Result<std::unique_ptr<HidTransport>> open_supported_hid_transport(int interface
 
     auto identity = normalize_hid_identity(
         record->vendor_id, record->product_id, record->interface_number,
-        record->product_string != nullptr ? std::wstring_view(record->product_string)
-                                          : std::wstring_view(),
+        select_identity_string(record->product_string, record->manufacturer_string),
         record->release_number);
     if (std::holds_alternative<Error>(identity)) {
       return std::get<Error>(std::move(identity));

@@ -10,7 +10,9 @@ This is an evidence register, not a command reference. No HID report layout, opc
 | --- | --- | --- | --- |
 | Vendor ID | `10ce` | Machine observed | Exact identified controller only |
 | Product ID | `eb73` | Machine observed | Exact identified controller only |
-| Product string | `XHC MACH3 CARD` | Machine observed | Exact identified controller only |
+| Identity string | `XHC MACH3 CARD` | Machine observed | Exact identified controller only |
+| Descriptor carrying it | **Manufacturer**, not product | Machine observed | Exact identified controller only |
+| Product string descriptor | **Absent** | Machine observed | Exact identified controller only |
 | USB class | Full-speed composite HID | Machine observed | Exact identified controller only |
 | HID interfaces | Two | Machine observed | Exact identified controller only |
 
@@ -67,6 +69,19 @@ Aggregate observations:
   control, and it is the strongest structural evidence currently held.
 - Exactly one distinct IN payload was observed in each capture, and it is common to all four
   including the control.
+
+### Correction: the identity string is not a product string
+
+Earlier revisions of this document described `XHC MACH3 CARD` as the device's *product*
+string. Direct inspection on a second operating system shows the device exposes **no product
+string descriptor at all**; the value is carried in the **manufacturer** descriptor, and a
+plain enumeration reports the product string as null.
+
+The earlier reading came from opening the device and calling a "get product string" API, whose
+HID backend synthesises that value from a name the operating system had itself derived from the
+manufacturer descriptor. The API answered a question the device had never been asked. Any
+identity predicate that matches only on a product string will therefore fail on a host that does
+not perform that substitution.
 
 ### Unresolved conflicts
 
