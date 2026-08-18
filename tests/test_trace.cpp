@@ -139,6 +139,36 @@ int main() {
   CHECK(std::get<TraceRecord>(maximum_tshark).report.size == 1U);
   CHECK(std::get<TraceRecord>(maximum_tshark).report.bytes[0] == 0xabU);
 
+  // TShark 4.x writes byte fields as unseparated hexadecimal; only its PDML `show`
+  // attribute uses colons. The importer must accept the form the tool actually emits.
+  const auto unseparated_lines = read_lines(fixture_path("tshark-unseparated.tsv"));
+  CHECK(unseparated_lines.size() == 2U);
+  auto unseparated_in = openxhc::parse_tshark_line(unseparated_lines[0]);
+  auto unseparated_out = openxhc::parse_tshark_line(unseparated_lines[1]);
+  CHECK(std::holds_alternative<TraceRecord>(unseparated_in));
+  CHECK(std::holds_alternative<TraceRecord>(unseparated_out));
+  CHECK(std::get<TraceRecord>(unseparated_in).direction == Direction::DeviceToHost);
+  CHECK(std::get<TraceRecord>(unseparated_in).report.size == 38U);
+  CHECK(std::get<TraceRecord>(unseparated_in).report.bytes[0] == 0xa1U);
+  CHECK(std::get<TraceRecord>(unseparated_in).report.bytes[37U] == 0xb2U);
+  CHECK(std::get<TraceRecord>(unseparated_out).direction == Direction::HostToDevice);
+  CHECK(std::get<TraceRecord>(unseparated_out).report.size == 32U);
+  CHECK(std::get<TraceRecord>(unseparated_out).report.bytes[0] == 0xc3U);
+  CHECK(std::get<TraceRecord>(unseparated_out).report.bytes[31U] == 0xd4U);
+
+  // Both accepted spellings must decode to identical bytes.
+  auto colon_form = openxhc::parse_tshark_line("0.1\t0x81\t04:c9:10");
+  auto plain_form = openxhc::parse_tshark_line("0.1\t0x81\t04c910");
+  CHECK(std::holds_alternative<TraceRecord>(colon_form));
+  CHECK(std::holds_alternative<TraceRecord>(plain_form));
+  CHECK(same_record(std::get<TraceRecord>(colon_form), std::get<TraceRecord>(plain_form)));
+
+  const auto plain_64 = openxhc::parse_tshark_line("0\t0x81\t" + repeated_native_bytes(64U));
+  CHECK(std::holds_alternative<TraceRecord>(plain_64));
+  CHECK(std::get<TraceRecord>(plain_64).report.size == 64U);
+  CHECK(std::get<TraceRecord>(plain_64).report.bytes[0] == 0xabU);
+  CHECK(std::get<TraceRecord>(plain_64).report.bytes[63U] == 0xabU);
+
   const auto summary = openxhc::summarize_trace(records);
   CHECK(summary.records == 3U);
   CHECK(summary.device_to_host == 2U);
@@ -196,6 +226,13 @@ int main() {
     oversized_tshark += "00";
   }
   CHECK(has_parse_error(openxhc::parse_tshark_line(oversized_tshark)));
+  // Unseparated form: odd digit count, bad digit, mixed spelling, and the 65-byte overflow.
+  CHECK(has_parse_error(openxhc::parse_tshark_line("0.1\t0x81\t04c")));
+  CHECK(has_parse_error(openxhc::parse_tshark_line("0.1\t0x81\t04cg")));
+  CHECK(has_parse_error(openxhc::parse_tshark_line("0.1\t0x81\t04:c910")));
+  CHECK(has_parse_error(openxhc::parse_tshark_line("0.1\t0x81\t04c9:10")));
+  CHECK(has_parse_error(
+      openxhc::parse_tshark_line("0\t0x81\t" + repeated_native_bytes(65U))));
   CHECK(has_parse_error(openxhc::parse_trace_line("18446744073709551616\tIN\t04")));
   CHECK(has_parse_error(openxhc::parse_tshark_line("18446744073709551616\t0x81\t04")));
   return 0;

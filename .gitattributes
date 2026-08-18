@@ -1,0 +1,7 @@
+# Parser fixtures are compared byte for byte. Never translate their line endings:
+# with core.autocrlf=true a Windows checkout rewrites them as CRLF, and a build run
+# from WSL against that working tree then reads a trailing CR into every payload,
+# failing the trace tests for a reason that has nothing to do with the parser.
+# Hosted CI is Linux-only, so it cannot catch this.
+tests/fixtures/*.tsv        text eol=lf
+tests/fixtures/*.xhctrace   text eol=lf

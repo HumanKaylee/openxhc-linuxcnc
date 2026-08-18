@@ -22,6 +22,8 @@ ctest --test-dir build-clang-normal --output-on-failure
 
 Every compiled project target retains `-Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion` on GCC and Clang. The CTest suite covers device identity, raw reports, lifecycle state, simulation, trace parsing/serialization, and CLI behavior. Negative cases include wrong identities and transitions, disconnected transport, malformed trace data, invalid CLI syntax, unsafe same-path import, output failures, and preservation of an existing destination.
 
+The TShark importer accepts a report payload written either as unseparated hexadecimal (`04c910`, the form `tshark -T fields` actually emits) or as colon-separated hexadecimal (`04:c9:10`, the form that appears in PDML `show` attributes). A record must use one spelling throughout; mixing them is rejected, as are odd digit counts, non-hexadecimal digits, and payloads longer than 64 bytes. Fixtures cover both spellings, and capture data is never hand-edited to fit the parser.
+
 ## SPDX and dependency lock
 
 Run the Python standard-library test directly:

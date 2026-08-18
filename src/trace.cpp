@@ -119,6 +119,10 @@ bool parse_tshark_payload(std::string_view text, RawReport& report) noexcept {
   if (text.empty()) {
     return false;
   }
+  // TShark's `-T fields` output writes byte fields as unseparated hexadecimal; the
+  // colon-separated spelling exists only in its PDML `show` attribute. Accept either
+  // spelling, but never a mixture of the two within one record.
+  const bool colon_separated = text.find(':') != std::string_view::npos;
   report.size = 0U;
   std::size_t offset{};
   while (offset < text.size()) {
@@ -135,12 +139,14 @@ bool parse_tshark_payload(std::string_view text, RawReport& report) noexcept {
     if (offset == text.size()) {
       break;
     }
-    if (text[offset] != ':') {
-      return false;
-    }
-    ++offset;
-    if (offset == text.size()) {
-      return false;
+    if (colon_separated) {
+      if (text[offset] != ':') {
+        return false;
+      }
+      ++offset;
+      if (offset == text.size()) {
+        return false;
+      }
     }
   }
   return report.size != 0U;
@@ -204,7 +210,9 @@ Result<TraceRecord> parse_tshark_line(std::string_view line) {
   }
   RawReport report{};
   if (!parse_tshark_payload(fields[2], report)) {
-    return parse_error("TShark report must contain one through 64 colon-separated hexadecimal bytes");
+    return parse_error(
+        "TShark report must contain one through 64 hexadecimal bytes, either unseparated "
+        "or colon-separated, without mixing the two");
   }
   return TraceRecord{timestamp_ns, direction, report};
 }
