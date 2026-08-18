@@ -85,14 +85,23 @@ ExitCode list_devices(bool show_paths) {
     return ExitCode::Success;
   }
 
-  const auto devices = openxhc::enumerate_supported_hid();
-  if (std::holds_alternative<openxhc::Error>(devices)) {
-    return print_hid_error(std::get<openxhc::Error>(devices));
+  // The controller resets itself roughly every 2.8 s on this bus, so a single enumeration
+  // can legitimately land in a window where the device is absent and report "not found".
+  // Retry briefly before believing a negative.
+  for (int attempt = 0; attempt < 15; ++attempt) {
+    auto devices = openxhc::enumerate_supported_hid();
+    if (!std::holds_alternative<openxhc::Error>(devices)) {
+      for (const auto& identity : std::get<std::vector<openxhc::DeviceIdentity>>(devices)) {
+        print_device(identity, "<redacted>");
+      }
+      return ExitCode::Success;
+    }
+    if (attempt == 14) {
+      return print_hid_error(std::get<openxhc::Error>(devices));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds{300});
   }
-  for (const auto& identity : std::get<std::vector<openxhc::DeviceIdentity>>(devices)) {
-    print_device(identity, "<redacted>");
-  }
-  return ExitCode::Success;
+  return ExitCode::Open;
 #endif
 }
 
@@ -378,6 +387,8 @@ ExitCode status_listen(int seconds, int interface_number, bool allow_long) {
   std::cout << "records=" << records << '\n'
             << "unrecognised=" << malformed << '\n'
             << "timeouts=" << timeouts << '\n'
+            << "reconnects=" << reconnects << '\n'
+            << "open_failures=" << open_failures << '\n'
             << "elapsed_ms=" << elapsed << '\n'
             << "changing_offsets=" << activity.changed_count() << '\n';
   std::cout << "changed=";
