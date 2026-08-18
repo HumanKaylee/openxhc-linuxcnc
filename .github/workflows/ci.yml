@@ -33,19 +33,15 @@ jobs:
       - run: cmake --build build-hid
       - run: ctest --test-dir build-hid --output-on-failure
       - run: python tests/test_generate_spdx.py
-
-  sanitizers:
-    runs-on: ubuntu-latest
-    env:
-      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install sanitizer dependencies
-        timeout-minutes: 10
-        run: |
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::ConnectTimeout=20 -o Acquire::https::ConnectTimeout=20 -o Acquire::http::Timeout=60 -o Acquire::https::Timeout=60 update
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::ConnectTimeout=20 -o Acquire::https::ConnectTimeout=20 -o Acquire::http::Timeout=60 -o Acquire::https::Timeout=60 install -y cmake ninja-build libhidapi-dev clang
-      - run: cmake -S . -B build-sanitizers -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug -DOPENXHC_ENABLE_SANITIZERS=ON
-      - run: cmake --build build-sanitizers
-      - run: ctest --test-dir build-sanitizers --output-on-failure
+      - name: Configure sanitizer build
+        if: matrix.compiler == 'clang++'
+        run: cmake -S . -B build-sanitizers -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug -DOPENXHC_ENABLE_SANITIZERS=ON
+      - name: Build with sanitizers
+        if: matrix.compiler == 'clang++'
+        run: cmake --build build-sanitizers
+      - name: Test with sanitizers
+        if: matrix.compiler == 'clang++'
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitizers --output-on-failure
