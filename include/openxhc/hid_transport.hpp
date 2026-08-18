@@ -51,4 +51,12 @@ class HidTransport final : public ITransport {
 // Opens the exact supported controller for reading. Available only when built with
 // HIDAPI; otherwise returns ErrorCode::UnsupportedDevice.
 Result<std::unique_ptr<HidTransport>> open_supported_hid_transport(int interface_number);
+
+// Whether a read failure warrants reopening the device rather than giving up.
+//
+// This controller resets itself roughly every 2.8 s while attached to a Linux host, so a
+// disconnect mid-stream is the expected environment, not a fault. A timeout means keep
+// reading on the same handle; a malformed record is a data problem and reopening would
+// only hide it.
+bool is_recoverable_read_error(ErrorCode code) noexcept;
 }  // namespace openxhc

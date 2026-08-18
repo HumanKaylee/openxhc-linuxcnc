@@ -6,6 +6,8 @@
 
 #include <cerrno>
 #include <chrono>
+#include <memory>
+#include <thread>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -307,28 +309,43 @@ ExitCode status_listen(int seconds, int interface_number, bool allow_long) {
     return ExitCode::Usage;
   }
 
-  auto opened = openxhc::open_supported_hid_transport(interface_number);
-  if (std::holds_alternative<openxhc::Error>(opened)) {
-    const auto& error = std::get<openxhc::Error>(opened);
-    std::cerr << "error: " << error.message << '\n';
-    return error.code == openxhc::ErrorCode::UnsupportedDevice ? ExitCode::Unsupported
-                                                               : ExitCode::Open;
-  }
-  auto transport = std::get<std::unique_ptr<openxhc::HidTransport>>(std::move(opened));
-
   openxhc::FieldActivity activity;
   std::uint64_t records = 0U;
   std::uint64_t timeouts = 0U;
   std::uint64_t malformed = 0U;
+  std::uint64_t reconnects = 0U;
+  std::uint64_t open_failures = 0U;
 
   const auto started = std::chrono::steady_clock::now();
   const auto deadline = started + std::chrono::seconds(seconds);
+  std::unique_ptr<openxhc::HidTransport> transport;
+
   while (std::chrono::steady_clock::now() < deadline) {
+    if (transport == nullptr) {
+      auto opened = openxhc::open_supported_hid_transport(interface_number);
+      if (std::holds_alternative<openxhc::Error>(opened)) {
+        // The controller resets itself periodically on this bus, so a failed open is
+        // expected during a reset window. Keep trying until the deadline.
+        ++open_failures;
+        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        continue;
+      }
+      transport = std::get<std::unique_ptr<openxhc::HidTransport>>(std::move(opened));
+      if (records > 0U || reconnects > 0U) {
+        ++reconnects;
+      }
+    }
+
     auto incoming = transport->read(std::chrono::milliseconds{500});
     if (std::holds_alternative<openxhc::Error>(incoming)) {
       const auto& error = std::get<openxhc::Error>(incoming);
       if (error.code == openxhc::ErrorCode::Timeout) {
         ++timeouts;
+        continue;
+      }
+      if (openxhc::is_recoverable_read_error(error.code)) {
+        transport->close();
+        transport.reset();
         continue;
       }
       std::cerr << "error: " << error.message << '\n';
@@ -346,7 +363,14 @@ ExitCode status_listen(int seconds, int interface_number, bool allow_long) {
     ++records;
     activity.observe(std::get<openxhc::StatusRecord>(parsed));
   }
-  transport->close();
+  if (transport != nullptr) {
+    transport->close();
+  }
+
+  if (records == 0U) {
+    std::cerr << "error: no records received (open failures=" << open_failures << ")\n";
+    return ExitCode::Open;
+  }
 
   const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                            std::chrono::steady_clock::now() - started)

@@ -56,6 +56,10 @@ Status HidTransport::write(const RawReport& report) {
                       "Writing to the controller is disabled at the current evidence gate");
 }
 
+bool is_recoverable_read_error(ErrorCode code) noexcept {
+  return code == ErrorCode::Disconnected;
+}
+
 void HidTransport::close() noexcept {
   if (closed_) {
     return;
@@ -70,6 +74,14 @@ void HidTransport::close() noexcept {
 namespace {
 constexpr std::uint16_t kXhcVendorId = 0x10ce;
 constexpr std::uint16_t kXhcProductId = 0xeb73;
+
+class HidSession final {
+ public:
+  HidSession() = default;
+  HidSession(const HidSession&) = delete;
+  HidSession& operator=(const HidSession&) = delete;
+  ~HidSession() { static_cast<void>(hid_exit()); }
+};
 
 class HidapiBackend final : public IHidBackend {
  public:
@@ -98,21 +110,47 @@ class HidapiBackend final : public IHidBackend {
 }  // namespace
 
 Result<std::unique_ptr<HidTransport>> open_supported_hid_transport(int interface_number) {
-  auto devices = enumerate_supported_hid_with_paths();
-  if (std::holds_alternative<Error>(devices)) {
-    return std::get<Error>(std::move(devices));
+  // Deliberately does NOT reuse enumerate_supported_hid_with_paths(). That helper opens
+  // every matching interface and issues manufacturer/product/serial descriptor queries.
+  // This controller resets itself roughly every 2.8 s while on a Linux host, and those
+  // extra control transfers do not reliably complete inside that window - measured as
+  // twelve consecutive open failures against a plain read that succeeded.
+  //
+  // hid_enumerate already reports the product string and release number, so the identity
+  // can be built without opening anything. Exactly one open is performed, for reading.
+  if (hid_init() != 0) {
+    return Error{ErrorCode::Disconnected, "Unable to initialize HIDAPI"};
   }
+  const HidSession session;
 
-  for (auto& device : std::get<std::vector<HidDeviceIdentity>>(devices)) {
-    if (device.identity.interface_number != interface_number) {
+  using EnumerationPointer = std::unique_ptr<hid_device_info, decltype(&hid_free_enumeration)>;
+  EnumerationPointer records(hid_enumerate(kXhcVendorId, kXhcProductId), &hid_free_enumeration);
+
+  for (const hid_device_info* record = records.get(); record != nullptr; record = record->next) {
+    if (record->vendor_id != kXhcVendorId || record->product_id != kXhcProductId ||
+        record->interface_number != interface_number || record->path == nullptr) {
       continue;
     }
-    hid_device* handle = hid_open_path(device.path.c_str());
+
+    auto identity = normalize_hid_identity(
+        record->vendor_id, record->product_id, record->interface_number,
+        record->product_string != nullptr ? std::wstring_view(record->product_string)
+                                          : std::wstring_view(),
+        record->release_number);
+    if (std::holds_alternative<Error>(identity)) {
+      return std::get<Error>(std::move(identity));
+    }
+    DeviceIdentity normalized = std::get<DeviceIdentity>(std::move(identity));
+    if (!is_supported_device(normalized)) {
+      continue;
+    }
+
+    hid_device* handle = hid_open_path(record->path);
     if (handle == nullptr) {
       return Error{ErrorCode::Disconnected, "Unable to open the HID interface for reading"};
     }
     return std::make_unique<HidTransport>(std::make_unique<HidapiBackend>(handle),
-                                          std::move(device.identity));
+                                          std::move(normalized));
   }
   return Error{ErrorCode::UnsupportedDevice, "Requested interface is not present"};
 }

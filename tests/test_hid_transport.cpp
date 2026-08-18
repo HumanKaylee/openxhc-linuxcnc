@@ -155,5 +155,16 @@ int main() {
     CHECK(transport.write(outgoing).error->code == ErrorCode::WriteDisabled);
   }
 
+  // Reconnect policy: only a lost link warrants reopening. A timeout means keep reading
+  // on the same handle, and a malformed record is a data fault that reopening would hide.
+  CHECK(openxhc::is_recoverable_read_error(ErrorCode::Disconnected));
+  CHECK(!openxhc::is_recoverable_read_error(ErrorCode::Timeout));
+  CHECK(!openxhc::is_recoverable_read_error(ErrorCode::InvalidReport));
+  CHECK(!openxhc::is_recoverable_read_error(ErrorCode::UnsupportedDevice));
+  CHECK(!openxhc::is_recoverable_read_error(ErrorCode::WriteDisabled));
+  CHECK(!openxhc::is_recoverable_read_error(ErrorCode::InvalidArgument));
+  CHECK(!openxhc::is_recoverable_read_error(ErrorCode::InvalidTransition));
+  CHECK(!openxhc::is_recoverable_read_error(ErrorCode::ParseError));
+
   return 0;
 }
