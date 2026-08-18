@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "openxhc/hid_probe.hpp"
 
+#include "openxhc/hid_transport.hpp"
+
 #include <algorithm>
 #include <array>
 #include <memory>
@@ -85,9 +87,12 @@ Result<std::vector<HidDeviceIdentity>> enumerate_supported_hid_with_paths() {
       return Error{ErrorCode::Disconnected, "Unable to query HID descriptors"};
     }
 
+    // This controller has no product string descriptor - its identity is carried in the
+    // manufacturer descriptor - so a product-only rule rejects the real device. Ask for
+    // whichever descriptor actually carries a name.
     auto identity = normalize_hid_identity(
         record->vendor_id, record->product_id, record->interface_number,
-        std::wstring_view(product.data()), record->release_number);
+        select_identity_string(product.data(), manufacturer.data()), record->release_number);
     if (std::holds_alternative<Error>(identity)) {
       return std::get<Error>(std::move(identity));
     }
