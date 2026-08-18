@@ -36,9 +36,9 @@ records reviewed direct project baselines, not host-only build or analysis tools
 ## Security-audit exception
 
 `arch-audit` reports [AVG-2898](https://security.archlinux.org/AVG-2898) as High
-severity for `libxml2`, with fixed version `Unknown`; the tracker remains open and is
-not hidden by this record. The installed package is `libxml2 2.15.3-1.1`, which is a
-direct runtime dependency of `wireshark-cli`.
+severity for `libxml2`, with `fixed: null`; the tracker remains open and is not hidden
+by this record. The installed package is `libxml2 2.15.3-1.1`, which is a direct
+runtime dependency of `wireshark-cli`.
 
 The primary CNA records identify the upstream libxml2 affected ranges as below
 `2.15.0` for [CVE-2025-49794](https://cveawg.mitre.org/api/cve/CVE-2025-49794) and
