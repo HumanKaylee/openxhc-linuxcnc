@@ -84,5 +84,35 @@ offline_boundaries:
   motion_or_output_commands_sent: false
 claims:
   offline_foundation_build_verified: true
+  read_only_hid_identification_verified: true
   live_linux_driver_support_verified: false
   machine_control_support_verified: false
+read_only_hid_identification:
+  date: "2026-08-18"
+  implementation_commit: 66cc703c486a62d7cb2934f059ba86fd8d1ea57a
+  device:
+    vendor_id: "10ce"
+    product_id: "eb73"
+    product: XHC MACH3 CARD
+    interfaces: [0, 1]
+  probe_runs: 2
+  paths_redacted_by_default: true
+  paths_recorded: false
+  hid_report_reads: false
+  hid_or_usb_writes: false
+  feature_or_output_reports: false
+  motion_or_output_commands_sent: false
+  new_kernel_usb_errors: 0
+  access_policy:
+    active: openxhc group, mode "0660"
+    legacy_uaccess_rule: preserved under a non-.rules filename and inactive
+  production_restore:
+    mach3_vm_service: active
+    qemu_process_count: 1
+    xhci_driver: vfio-pci
+    windows_matching_nodes: 5
+    windows_node_config_manager_errors: 0
+    mach3_status: XHC NcUsbPod Connected.
+    emergency_mode: true
+    gcode_loaded: false
+    reset_pressed: false

@@ -7,15 +7,26 @@ OpenXHC is an independent effort to document and implement native LinuxCNC suppo
 ## Verified today
 
 - The device is a two-interface USB HID controller accessible through standard HID APIs.
-- The repository contains offline parsers, simulation, and evidence tooling only.
+- **Read-only HID identification verified** on the target Acer host for exact interfaces 0 and 1 of `10ce:eb73` / `XHC MACH3 CARD`.
+- Device paths are redacted by default as `path=<redacted>`; no path was retained in committed evidence.
+- The production Mach3 VM was restored and re-verified after the bounded identification session.
+- The repository also contains offline parsers, simulation, and evidence tooling.
 
 ## Not yet working
 
-- Motion, homing, limits, probing, outputs, spindle control, and LinuxCNC HAL integration.
+- **Motion and outputs do not exist.** Homing, limits, probing, spindle control, and LinuxCNC HAL integration are also not implemented.
 
-## Offline trace tooling
+## Read-only discovery and offline trace tooling
 
-`openxhcctl` only validates and summarizes sanitized trace files or converts TShark text into the canonical offline trace format. It has no live-device or machine-control support.
+`openxhcctl device list` performs descriptor-only HID discovery. It can initialize HIDAPI, enumerate the exact VID/PID, open matching interfaces only to read identity descriptors, and close them. It has no report-write, feature-report, output-report, raw-USB, motion, or machine-control path.
+
+```sh
+openxhcctl device list
+```
+
+Paths are redacted by default. The local-only `--show-paths` option must not be used for committed evidence.
+
+The remaining commands validate and summarize sanitized trace files or convert TShark text into the canonical offline trace format:
 
 ```sh
 openxhcctl trace validate <input.xhctrace>
@@ -27,7 +38,7 @@ openxhcctl trace import-tshark <input.tsv> <output.xhctrace>
 
 The project aims to create an independently implemented, evidence-backed LinuxCNC integration for the exact identified controller. LinuxCNC remains responsible for G-code interpretation, trajectory planning, kinematics, and machine policy. OpenXHC is intended to translate documented device state and commands only after each behavior has met the project’s safety and evidence gates.
 
-This repository contains no installation procedure and makes no claim of hardware support. Read [Safety](docs/SAFETY.md), [Protocol evidence](docs/PROTOCOL.md), and [Parity](docs/PARITY.md) before evaluating any future release.
+This repository makes no claim of machine-control support. The verified live scope ends at read-only identity descriptors; it does not establish input streaming, protocol parity, motion, or outputs. Read [Safety](docs/SAFETY.md), [Protocol evidence](docs/PROTOCOL.md), and [Parity](docs/PARITY.md) before evaluating any future release.
 
 ## Project map
 
