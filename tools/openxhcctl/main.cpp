@@ -35,7 +35,8 @@ void print_usage() {
             << "       openxhcctl trace summary <input.xhctrace>\n"
             << "       openxhcctl trace import-tshark <input.tsv> <output.xhctrace>\n"
             << "       openxhcctl device list [--show-paths]\n"
-            << "       openxhcctl status [--seconds N] [--interface N]\n";
+            << "       openxhcctl status [--seconds N] [--interface N] [--allow-long]\n"
+            << "                         [--trace-out <file.xhctrace>]\n";
 }
 
 #ifndef OPENXHCCTL_TEST_HID_FIXTURE
@@ -51,8 +52,8 @@ void print_device(const openxhc::DeviceIdentity& identity, std::string_view path
   const char caller_fill = std::cout.fill();
   std::cout << std::hex << std::setfill('0') << std::setw(4) << identity.vendor_id << ':'
             << std::setw(4) << identity.product_id << std::dec << std::setfill(' ')
-            << " interface=" << identity.interface_number << " product=\""
-            << identity.product_string << "\" release=0x" << std::hex << std::setfill('0')
+            << " interface=" << identity.interface_number << " identity=\""
+            << identity.identity_string << "\" release=0x" << std::hex << std::setfill('0')
             << std::setw(4) << identity.release_number << std::dec << std::setfill(' ')
             << " path=" << path << '\n';
   std::cout.flags(caller_flags);
@@ -307,7 +308,8 @@ constexpr int kStatusMaxSecondsWithoutOverride = 120;
 // Read-only listen on the device-initiated interrupt IN stream. Bounded by construction:
 // it never writes, never loops unbounded, and reports where the record is dynamic rather
 // than interpreting any byte.
-ExitCode status_listen(int seconds, int interface_number, bool allow_long) {
+ExitCode status_listen(int seconds, int interface_number, bool allow_long,
+                       const char* trace_out) {
   if (seconds <= 0) {
     std::cerr << "error: --seconds must be positive\n";
     return ExitCode::Usage;
@@ -316,6 +318,19 @@ ExitCode status_listen(int seconds, int interface_number, bool allow_long) {
     std::cerr << "error: --seconds above " << kStatusMaxSecondsWithoutOverride
               << " requires --allow-long\n";
     return ExitCode::Usage;
+  }
+
+  // Writing the live stream in the same native format the offline tooling already
+  // consumes means a Linux read can be validated and summarised by exactly the same
+  // commands as a Windows capture, instead of a second bespoke path.
+  std::ofstream trace_file;
+  if (trace_out != nullptr) {
+    trace_file.open(trace_out, std::ios::binary | std::ios::trunc);
+    if (!trace_file.is_open()) {
+      std::cerr << "error: unable to open trace output\n";
+      return ExitCode::Open;
+    }
+    trace_file << kTraceHeader << '\n';
   }
 
   openxhc::FieldActivity activity;
@@ -371,9 +386,30 @@ ExitCode status_listen(int seconds, int interface_number, bool allow_long) {
     }
     ++records;
     activity.observe(std::get<openxhc::StatusRecord>(parsed));
+
+    if (trace_file.is_open()) {
+      const auto since_start = std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::steady_clock::now() - started);
+      openxhc::TraceRecord record{static_cast<std::uint64_t>(since_start.count()),
+                                  openxhc::Direction::DeviceToHost, raw};
+      const auto written = openxhc::write_trace_record(trace_file, record);
+      if (!written.success) {
+        std::cerr << "error: " << written.error->message << '\n';
+        transport->close();
+        return ExitCode::Open;
+      }
+    }
   }
   if (transport != nullptr) {
     transport->close();
+  }
+  if (trace_file.is_open()) {
+    trace_file.flush();
+    if (!trace_file) {
+      std::cerr << "error: failed to write trace output\n";
+      return ExitCode::Open;
+    }
+    trace_file.close();
   }
 
   if (records == 0U) {
@@ -407,6 +443,7 @@ int main(int argc, char* argv[]) {
     int seconds = 10;
     int interface_number = 0;
     bool allow_long = false;
+    const char* trace_out = nullptr;
     for (int index = 2; index < argc; ++index) {
       const std::string_view option(argv[index]);
       if (option == "--allow-long") {
@@ -422,12 +459,14 @@ int main(int argc, char* argv[]) {
         seconds = std::atoi(value.c_str());
       } else if (option == "--interface") {
         interface_number = std::atoi(value.c_str());
+      } else if (option == "--trace-out") {
+        trace_out = argv[index];
       } else {
         print_usage();
         return static_cast<int>(ExitCode::Usage);
       }
     }
-    return static_cast<int>(status_listen(seconds, interface_number, allow_long));
+    return static_cast<int>(status_listen(seconds, interface_number, allow_long, trace_out));
   }
 
   if (argc >= 3 && std::string_view(argv[1]) == "device" &&

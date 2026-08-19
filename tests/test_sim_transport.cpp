@@ -36,7 +36,7 @@ int main() {
   CHECK(device.vendor_id == 0x10ce);
   CHECK(device.product_id == 0xeb73);
   CHECK(device.interface_number == 0);
-  CHECK(device.product_string == "XHC MACH3 CARD");
+  CHECK(device.identity_string == "XHC MACH3 CARD");
   CHECK(device.release_number == 0x0100);
 
   const std::array<std::uint8_t, 2> bytes{0x04, 0x7e};

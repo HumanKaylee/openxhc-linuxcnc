@@ -19,7 +19,7 @@ struct HidDeviceIdentity {
 Result<DeviceIdentity> normalize_hid_identity(std::uint16_t vendor_id,
                                               std::uint16_t product_id,
                                               int interface_number,
-                                              std::wstring_view product_string,
+                                              std::wstring_view identity_string,
                                               std::uint16_t release_number);
 
 // Chooses which enumeration descriptor carries the device's identity string.

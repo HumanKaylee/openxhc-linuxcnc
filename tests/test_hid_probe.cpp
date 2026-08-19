@@ -219,7 +219,7 @@ int main() {
 
   reset_fake(FakeScenario::NonAsciiProduct);
   CHECK(has_error(openxhc::enumerate_supported_hid(), openxhc::ErrorCode::ParseError,
-                  "HID product string is not printable ASCII"));
+                  "HID identity string is not printable ASCII"));
   CHECK(exit_calls == 1);
   CHECK(free_calls == 1);
   CHECK(open_calls == 1);
@@ -244,7 +244,7 @@ int main() {
       openxhc::normalize_hid_identity(0x10ce, 0xeb73, 0, L"XHC MACH3 CARD", 0x0100);
   CHECK(std::holds_alternative<openxhc::DeviceIdentity>(first));
   CHECK(openxhc::is_supported_device(std::get<openxhc::DeviceIdentity>(first)));
-  CHECK(std::get<openxhc::DeviceIdentity>(first).product_string == "XHC MACH3 CARD");
+  CHECK(std::get<openxhc::DeviceIdentity>(first).identity_string == "XHC MACH3 CARD");
 
   const auto second =
       openxhc::normalize_hid_identity(0x10ce, 0xeb73, 1, L"XHC MACH3 CARD", 0x0100);
@@ -254,11 +254,11 @@ int main() {
   const auto non_ascii =
       openxhc::normalize_hid_identity(0x10ce, 0xeb73, 0, L"XHC \u673a", 0x0100);
   CHECK(has_error(non_ascii, openxhc::ErrorCode::ParseError,
-                  "HID product string is not printable ASCII"));
+                  "HID identity string is not printable ASCII"));
   const auto control_character =
       openxhc::normalize_hid_identity(0x10ce, 0xeb73, 0, L"XHC\nCARD", 0x0100);
   CHECK(has_error(control_character, openxhc::ErrorCode::ParseError,
-                  "HID product string is not printable ASCII"));
+                  "HID identity string is not printable ASCII"));
 
   const auto wrong_vendor =
       openxhc::normalize_hid_identity(0x10cf, 0xeb73, 0, L"XHC MACH3 CARD", 0x0100);

@@ -15,13 +15,13 @@ namespace openxhc {
 Result<DeviceIdentity> normalize_hid_identity(std::uint16_t vendor_id,
                                               std::uint16_t product_id,
                                               int interface_number,
-                                              std::wstring_view product_string,
+                                              std::wstring_view identity_string,
                                               std::uint16_t release_number) {
   std::string normalized;
-  normalized.reserve(product_string.size());
-  for (const wchar_t character : product_string) {
+  normalized.reserve(identity_string.size());
+  for (const wchar_t character : identity_string) {
     if (character < 0x20 || character > 0x7e) {
-      return Error{ErrorCode::ParseError, "HID product string is not printable ASCII"};
+      return Error{ErrorCode::ParseError, "HID identity string is not printable ASCII"};
     }
     normalized.push_back(static_cast<char>(character));
   }
