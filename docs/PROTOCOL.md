@@ -83,15 +83,51 @@ manufacturer descriptor. The API answered a question the device had never been a
 identity predicate that matches only on a product string will therefore fail on a host that does
 not perform that substitution.
 
-### Unresolved conflicts
+### Declared descriptors, read from the device
 
-Recorded rather than reconciled, per the rules below.
+Read directly from the controller's own descriptors on a second operating system. These are
+the device's declarations, not inferences from traffic.
 
-- The 64-byte OUT record length **disagrees with this device's own HID output report descriptor**,
-  which declares a 32-byte report. Whether the capture layer pads to the endpoint's maximum packet
-  size, or the transfer genuinely carries 64 bytes, is **not established**.
-- The 38-byte IN record length likewise exceeds the 36 bytes implied by the input report
-  descriptor's declared count plus its report ID. The two trailing bytes are **unexplained**.
+| Field | Interface 0 | Interface 1 |
+| --- | --- | --- |
+| Endpoint | `0x81` IN | `0x02` OUT |
+| `wMaxPacketSize` | 64 | 64 |
+| `bInterval` | 1 | 1 |
+| Report descriptor length | 23 | 21 |
+| Declared report | `REPORT_ID 0x04`, `REPORT_COUNT 37`, `REPORT_SIZE 8` | 32-byte report |
+
+Interface 0's input report descriptor reads
+`06 00 ff 09 01 a1 01 85 04 09 01 15 00 26 ff 00 95 25 75 08 81 02 c0` — a vendor-defined usage
+page, one report ID, and 37 data bytes.
+
+The string descriptors confirm the identity finding above: `iManufacturer` is index 1 and reads
+`XHC MACH3 CARD`, while `iProduct` is index **0** — the device has no product string at all.
+
+### Both previously recorded conflicts are now resolved
+
+- **The 38-byte IN record is correct and declared.** `REPORT_COUNT` is 37 (`0x25`) plus the
+  one report-ID byte, which is exactly 38. An earlier note describing this as "two unexplained
+  trailing bytes" was wrong; it assumed a report count this device does not use.
+- **The 64-byte OUT record is endpoint padding, not payload.** The interface declares a 32-byte
+  report, `wMaxPacketSize` is 64, and across every captured OUT record **bytes 27 through 63 are
+  zero without exception** — the highest non-zero offset observed anywhere is 26. The payload
+  fits inside the declared 32 bytes; the capture layer reports the full maximum packet.
+
+> **Report counts vary between units sharing this VID and PID.** This device declares 37 input
+> data bytes; other units of the same identity have been described with a different count. Any
+> profile must be pinned to descriptors read from the device in front of you, not to a value
+> carried over from another unit.
+
+### Structural observation, from the startup captures
+
+Across the six OUT records of both startup runs, **55 of 64 byte offsets are zero in every
+record**, and the offsets that ever differ are `0, 5, 9, 13, 17, 18, 21, 22, 26`. Three of the
+six records carry only their leading byte. The differing offsets after the first are spaced four
+apart, which is consistent with a leading byte followed by fixed-width four-byte fields.
+
+This is a statement about spacing and occupancy only. **No offset is claimed to be an axis, a
+distance, a rate, a flag, or anything else**, and no field may be named until correlated
+observations with a control exist.
 
 No field, offset, opcode, or safety meaning is claimed from any of this. The captures establish
 shape, direction, cadence and repeatability only.

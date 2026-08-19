@@ -9,7 +9,8 @@ Only `Machine verified` means working. This matrix concerns the exact USB identi
 | Windows capability | Current evidence | Notes |
 | --- | --- | --- |
 | Device identity | Machine observed | `10ce:eb73` / `XHC MACH3 CARD`; two HID interfaces |
-| Raw report envelope | Captured | 38-byte IN and 64-byte OUT records observed; no field meaning claimed |
+| Declared report descriptors | Machine observed | Read from the device: 38-byte IN (`REPORT_ID 0x04` + 37 data bytes), 32-byte OUT report, both endpoints `wMaxPacketSize` 64, `bInterval` 1 |
+| Raw report envelope | Captured | 38-byte IN matches the declared report exactly; observed 64-byte OUT is max-packet padding over a declared 32, with bytes 27–63 always zero |
 | Startup message sequence | Captured | Six OUT records, byte-identical across two independent runs, absent from the closed-application control |
 | Device-initiated status cadence | Captured | 1.40–1.42 s IN interval, present with the vendor application closed |
 | Connection, identification, and negotiation | Unknown | Sequence captured, but no message purpose established and no driver behavior claimed |
